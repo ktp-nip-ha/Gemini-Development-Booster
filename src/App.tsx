@@ -5,146 +5,126 @@ import PromptGenerator from "./components/PromptGenerator";
 import RoadmapTodo from "./components/RoadmapTodo";
 import Dashboard from "./components/Dashboard";
 import { StickyNote, Eraser } from "lucide-react";
-import { useLocalStorage } from "./hooks/useLocalStorage";
+// Firebaseを使うためのツールをインポート
+import { db } from "./firebase";
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  query, 
+  orderBy 
+} from "firebase/firestore";
 import type { Project, ProjectDraft, RoadmapItem } from "./types/project";
 
 function App() {
-  const [projects, setProjects] = useLocalStorage<Project[]>("sidekick_projects", []);
+  // データの保存先をFirestoreに変更するため、useStateで管理
+  const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 既存データの移行処理 & チュートリアルデータの初期化
+  // Firestoreからリアルタイムにデータを読み込む設定
   useEffect(() => {
-    // 一時メモのマイグレーション用データを取得
-    const legacyScratchPad = localStorage.getItem("sidekick_scratchpad") || localStorage.getItem("devBuddy_scratchpad");
+    // projectsコレクションを参照（作成日時の降順で並び替え）
+    const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
     
-    // 完全に空の場合（新規ユーザー）
-    const isFirstTime = localStorage.getItem("sidekick_projects") === null && localStorage.getItem("devBuddy_projects") === null;
-    
-    if (isFirstTime) {
-      const tutorialProject: Project = {
-        id: "tutorial-project",
-        name: "Sidekickへようこそ！",
-        draft: {
-          title: "Sidekickを使いこなすための第一歩",
-          concept: "Sidekick（開発の相棒）は、あなたの開発をAIと一緒に加速させるためのツールです。\nこのプロジェクトは使い方のヒントをまとめたチュートリアルです。",
-          features: "・企画素案の作成\n・ロードマップとタスク管理\n・AI（Gemini）へのプロンプト生成\n・一時的なメモ（ScratchPad）の活用",
-          vibe: "ワクワクする・スムーズな開発・効率的",
-          techStack: "React, Tailwind CSS, Lucide Icons, Vite"
-        },
-        roadmap: [
-          {
-            id: "step-1",
-            title: "STEP 1: 企画を練る",
-            tasks: [
-              { id: "t1", title: "「企画素案」の各項目を埋めてみる", completed: false, assignee: "human" },
-              { id: "t2", title: "「プロンプトをコピー」してAIに相談する", completed: false, assignee: "human" }
-            ],
-            expanded: true
-          },
-          {
-            id: "step-2",
-            title: "STEP 2: ロードマップを作成する",
-            tasks: [
-              { id: "t3", title: "AIが提案したタスクを「ロードマップ」に追加する", completed: false, assignee: "ai" },
-              { id: "t4", title: "タスクの担当（人間 or AI）を決める", completed: false, assignee: "human" }
-            ],
-            expanded: true
-          },
-          {
-            id: "step-3",
-            title: "STEP 3: 開発を進める",
-            tasks: [
-              { id: "t5", title: "完了したタスクにチェックを入れる", completed: false, assignee: "human" },
-              { id: "t6", title: "一時メモを使いながら実装を進める", completed: false, assignee: "human" }
-            ],
-            expanded: true
-          }
-        ],
-        memo: legacyScratchPad ? JSON.parse(legacyScratchPad) : "",
-        createdAt: Date.now()
-      };
-      setProjects([tutorialProject]);
-      if (legacyScratchPad) {
-        localStorage.removeItem("sidekick_scratchpad");
-        localStorage.removeItem("devBuddy_scratchpad");
-      }
-    } else if (projects.length > 0 && legacyScratchPad) {
-      // 既存プロジェクトがある場合、最初のプロジェクトにメモを引き継ぐ
-      const memoContent = JSON.parse(legacyScratchPad);
-      if (memoContent) {
-        setProjects(prev => prev.map((p, idx) => 
-          idx === 0 ? { ...p, memo: p.memo || memoContent } : p
-        ));
-      }
-      localStorage.removeItem("sidekick_scratchpad");
-      localStorage.removeItem("devBuddy_scratchpad");
-    } else if (projects.length === 0) {
-      // 既存データの移行処理
-      const oldTasks = localStorage.getItem("sidekick_tasks") || localStorage.getItem("devBuddy_tasks");
-      const oldFocus = localStorage.getItem("sidekick_focus") || localStorage.getItem("devBuddy_focus");
-      const oldContext = localStorage.getItem("sidekick_context") || localStorage.getItem("devBuddy_context");
+    // データが変更されたら自動で実行される（リアルタイム同期）
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const projectsData: Project[] = [];
+      querySnapshot.forEach((doc) => {
+        projectsData.push({ id: doc.id, ...doc.data() } as Project);
+      });
+      setProjects(projectsData);
+      setIsLoading(false); // 読み込み完了
+    }, (error) => {
+      console.error("Firestoreからの読み込みエラー:", error);
+      setIsLoading(false);
+    });
 
-      if (oldTasks || oldFocus || oldContext) {
-        const tasks: any[] = oldTasks ? JSON.parse(oldTasks) : [];
-        const defaultProject: Project = {
-          id: "default",
-          name: "既存プロジェクト",
-          draft: {
-            title: "",
-            concept: oldFocus ? JSON.parse(oldFocus) : "",
-            features: oldContext ? JSON.parse(oldContext) : "",
-            vibe: "",
-            techStack: ""
-          },
-          roadmap: tasks.length > 0 ? [{ id: "legacy", title: "既存タスク", tasks, expanded: true }] : [],
-          createdAt: Date.now()
-        };
-        setProjects([defaultProject]);
-        
-        // 移行後に古いデータを削除（任意）
-        localStorage.removeItem("sidekick_tasks");
-        localStorage.removeItem("devBuddy_tasks");
-        localStorage.removeItem("sidekick_focus");
-        localStorage.removeItem("devBuddy_focus");
-        localStorage.removeItem("sidekick_context");
-        localStorage.removeItem("devBuddy_context");
-      }
-    }
+    // コンポーネントが消えるときに監視を止める
+    return () => unsubscribe();
   }, []);
+
+  // 既存のローカルストレージからの移行処理（一度だけ実行）
+  useEffect(() => {
+    const migrateData = async () => {
+      const localData = localStorage.getItem("sidekick_projects");
+      if (localData) {
+        const localProjects: Project[] = JSON.parse(localData);
+        // Firestoreにまだデータがない場合のみ移行
+        if (projects.length === 0 && localProjects.length > 0) {
+          console.log("ローカルデータをFirestoreに移行中...");
+          for (const p of localProjects) {
+            await setDoc(doc(db, "projects", p.id), p);
+          }
+          // 移行が終わったらローカルストレージをクリア（任意）
+          // localStorage.removeItem("sidekick_projects");
+        }
+      }
+    };
+    
+    if (!isLoading && projects.length === 0) {
+      migrateData();
+    }
+  }, [isLoading, projects.length]);
 
   const currentProject = projects.find(p => p.id === currentProjectId);
   const currentRoadmap = currentProject?.roadmap || [];
 
-  const handleCreateProject = (name: string) => {
+  // プロジェクトを新規作成してFirestoreに保存
+  const handleCreateProject = async (name: string) => {
+    const id = Date.now().toString(); // IDを生成
     const newProject: Project = {
-      id: Date.now().toString(),
+      id,
       name,
       draft: { title: "", concept: "", features: "", vibe: "", techStack: "" },
       roadmap: [],
       memo: "",
       createdAt: Date.now()
     };
-    setProjects(prev => [...prev, newProject]);
-  };
-
-  const handleDeleteProject = (id: string) => {
-    setProjects(prev => prev.filter(p => p.id !== id));
-    if (currentProjectId === id) {
-      setCurrentProjectId(null);
+    
+    try {
+      // projectsコレクションに新しいドキュメントを追加
+      await setDoc(doc(db, "projects", id), newProject);
+      setCurrentProjectId(id); // 作成したプロジェクトを開く
+    } catch (error) {
+      console.error("プロジェクトの作成に失敗しました:", error);
+      alert("保存に失敗しました。Firebaseの設定を確認してください。");
     }
   };
 
-  const updateCurrentProject = (updater: Partial<Project> | ((prev: Project) => Project)) => {
-    if (!currentProjectId) return;
-    setProjects(prev => prev.map(p => {
-      if (p.id === currentProjectId) {
-        if (typeof updater === 'function') {
-          return updater(p);
-        }
-        return { ...p, ...updater };
+  // プロジェクトをFirestoreから削除
+  const handleDeleteProject = async (id: string) => {
+    if (!window.confirm("このプロジェクトを削除してもよろしいですか？")) return;
+
+    try {
+      await deleteDoc(doc(db, "projects", id));
+      if (currentProjectId === id) {
+        setCurrentProjectId(null);
       }
-      return p;
-    }));
+    } catch (error) {
+      console.error("プロジェクトの削除に失敗しました:", error);
+    }
+  };
+
+  // プロジェクトの内容をFirestoreで更新
+  const updateCurrentProject = async (updater: Partial<Project> | ((prev: Project) => Project)) => {
+    if (!currentProjectId || !currentProject) return;
+
+    let updatedProject: Project;
+    if (typeof updater === 'function') {
+      updatedProject = updater(currentProject);
+    } else {
+      updatedProject = { ...currentProject, ...updater };
+    }
+
+    try {
+      // 特定のIDのドキュメントを更新
+      await setDoc(doc(db, "projects", currentProjectId), updatedProject);
+    } catch (error) {
+      console.error("データの更新に失敗しました:", error);
+    }
   };
 
   const handleDraftChange = (draftOrUpdater: ProjectDraft | ((prev: ProjectDraft) => ProjectDraft)) => {
@@ -172,6 +152,14 @@ function App() {
   const handleMemoChange = (memo: string) => {
     updateCurrentProject({ memo });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-slate-500">データを読み込み中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
