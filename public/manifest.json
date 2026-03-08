@@ -1,0 +1,23 @@
+{
+  "name": "Sidekick - 開発の相棒",
+  "short_name": "Sidekick",
+  "description": "AI(Gemini)と一緒に開発を進めるためのロードマップ・タスク管理ツール",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

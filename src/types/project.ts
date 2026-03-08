@@ -27,5 +27,6 @@ export interface Project {
   name: string;
   draft: ProjectDraft;
   roadmap: RoadmapItem[];
+  memo?: string;
   createdAt: number;
 }

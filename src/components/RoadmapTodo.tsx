@@ -4,7 +4,7 @@ import type { RoadmapItem } from "../types/project";
 
 interface RoadmapTodoProps {
   roadmap: RoadmapItem[];
-  onChange: (roadmap: RoadmapItem[]) => void;
+  onChange: (roadmap: RoadmapItem[] | ((prev: RoadmapItem[]) => RoadmapItem[])) => void;
   projectName?: string;
   scratchPad?: string;
 }
@@ -20,9 +20,14 @@ export default function RoadmapTodo({ roadmap = [], onChange, projectName = "不
     e.preventDefault();
     if (!newRoadmapTitle.trim()) return;
     
-    onChange([
-      ...safeRoadmap,
-      { id: Date.now().toString(), title: newRoadmapTitle, tasks: [], expanded: true }
+    onChange(prev => [
+      ...(prev || []),
+      { 
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9), 
+        title: newRoadmapTitle, 
+        tasks: [], 
+        expanded: true 
+      }
     ]);
     setNewRoadmapTitle("");
   };
@@ -31,13 +36,18 @@ export default function RoadmapTodo({ roadmap = [], onChange, projectName = "不
     const title = window.prompt("タスクを入力してください");
     if (!title?.trim()) return;
 
-    onChange(safeRoadmap.map(item => {
+    onChange(prev => (prev || []).map(item => {
       if (item.id === roadmapId) {
         return {
           ...item,
           tasks: [
             ...(item.tasks || []),
-            { id: Date.now().toString(), title, completed: false, assignee: "human" }
+            { 
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9), 
+              title, 
+              completed: false, 
+              assignee: "human" 
+            }
           ]
         };
       }
@@ -46,19 +56,19 @@ export default function RoadmapTodo({ roadmap = [], onChange, projectName = "不
   };
 
   const toggleRoadmapExpanded = (id: string) => {
-    onChange(safeRoadmap.map(item => 
+    onChange(prev => (prev || []).map(item => 
       item.id === id ? { ...item, expanded: !item.expanded } : item
     ));
   };
 
   const deleteRoadmapItem = (id: string) => {
     if (window.confirm("このセクションを削除しますか？")) {
-      onChange(safeRoadmap.filter(item => item.id !== id));
+      onChange(prev => (prev || []).filter(item => item.id !== id));
     }
   };
 
   const toggleTask = (roadmapId: string, taskId: string) => {
-    onChange(safeRoadmap.map(item => {
+    onChange(prev => (prev || []).map(item => {
       if (item.id === roadmapId) {
         return {
           ...item,
@@ -70,7 +80,7 @@ export default function RoadmapTodo({ roadmap = [], onChange, projectName = "不
   };
 
   const toggleAssignee = (roadmapId: string, taskId: string) => {
-    onChange(safeRoadmap.map(item => {
+    onChange(prev => (prev || []).map(item => {
       if (item.id === roadmapId) {
         return {
           ...item,
@@ -87,7 +97,7 @@ export default function RoadmapTodo({ roadmap = [], onChange, projectName = "不
   };
 
   const deleteTask = (roadmapId: string, taskId: string) => {
-    onChange(safeRoadmap.map(item => {
+    onChange(prev => (prev || []).map(item => {
       if (item.id === roadmapId) {
         return {
           ...item,
@@ -128,35 +138,36 @@ ${taskList || "（タスクなし）"}
   const handleImportMarkdown = () => {
     if (!markdownInput.trim()) return;
 
-    const lines = markdownInput.split("\n");
-    const newRoadmap: RoadmapItem[] = [...safeRoadmap];
-    let currentItem: RoadmapItem | null = null;
+    onChange(prev => {
+      const lines = markdownInput.split("\n");
+      const newRoadmap: RoadmapItem[] = [...(prev || [])];
+      let currentItem: RoadmapItem | null = null;
 
-    lines.forEach(line => {
-      // 追加：もし行が ``` で始まっていたら、その行は無視して次に進む
-      if (line.trim().startsWith('```')) return;
-      const roadmapMatch = line.match(/^###\s+(.+)$/);
-      const taskMatch = line.match(/^[*-]\s+\[([ xX]?)\]\s+(.+)$/);
+      lines.forEach(line => {
+        if (line.trim().startsWith('```')) return;
+        const roadmapMatch = line.match(/^###\s+(.+)$/);
+        const taskMatch = line.match(/^[*-]\s+\[([ xX]?)\]\s+(.+)$/);
 
-      if (roadmapMatch) {
-        currentItem = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          title: roadmapMatch[1].trim(),
-          tasks: [],
-          expanded: true
-        };
-        newRoadmap.push(currentItem);
-      } else if (taskMatch && currentItem) {
-        currentItem.tasks.push({
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          title: taskMatch[2].trim(),
-          completed: taskMatch[1].toLowerCase() === "x",
-          assignee: "human"
-        });
-      }
+        if (roadmapMatch) {
+          currentItem = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            title: roadmapMatch[1].trim(),
+            tasks: [],
+            expanded: true
+          };
+          newRoadmap.push(currentItem);
+        } else if (taskMatch && currentItem) {
+          currentItem.tasks.push({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            title: taskMatch[2].trim(),
+            completed: taskMatch[1].toLowerCase() === "x",
+            assignee: "human"
+          });
+        }
+      });
+      return newRoadmap;
     });
 
-    onChange(newRoadmap);
     setMarkdownInput("");
     alert("Markdownを取り込みました");
   };

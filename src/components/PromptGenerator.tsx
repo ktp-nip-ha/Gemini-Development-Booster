@@ -4,7 +4,7 @@ import type { ProjectDraft } from "../types/project";
 
 interface PromptGeneratorProps {
   draft: ProjectDraft;
-  onChange: (draft: ProjectDraft) => void;
+  onChange: (draft: ProjectDraft | ((prev: ProjectDraft) => ProjectDraft)) => void;
 }
 
 export default function PromptGenerator({ draft, onChange }: PromptGeneratorProps) {
@@ -12,7 +12,7 @@ export default function PromptGenerator({ draft, onChange }: PromptGeneratorProp
   const [isExpanded, setIsExpanded] = useState(false);
 
   const updateDraft = (field: keyof ProjectDraft, value: string) => {
-    onChange({ ...draft, [field]: value });
+    onChange(prev => ({ ...prev, [field]: value }));
   };
 
   const getFormattedDraft = () => {
@@ -100,7 +100,7 @@ ${getFormattedDraft()}`;
               <input
                 type="text"
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
-                placeholder="例：DevBuddy"
+                placeholder="例：Sidekick"
                 value={draft.title}
                 onChange={(e) => updateDraft("title", e.target.value)}
               />

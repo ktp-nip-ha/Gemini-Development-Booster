@@ -33,7 +33,7 @@ export default function Header({ currentProjectName, onBackToDashboard }: Header
                   <span className="text-slate-800">{currentProjectName}</span>
                 </span>
               ) : (
-                "Gemini Development Booster"
+                "Sidekick"
               )}
             </h1>
           </div>
