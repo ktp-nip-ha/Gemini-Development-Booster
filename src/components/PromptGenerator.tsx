@@ -1,5 +1,5 @@
 import { FileText, Check, MessageSquare, Map, ChevronUp, Edit3 } from "lucide-react";
-import { useState } from "react";
+import { useState, memo } from "react";
 import type { ProjectDraft } from "../types/project";
 
 interface PromptGeneratorProps {
@@ -7,7 +7,9 @@ interface PromptGeneratorProps {
   onChange: (draft: ProjectDraft | ((prev: ProjectDraft) => ProjectDraft)) => void;
 }
 
-export default function PromptGenerator({ draft, onChange }: PromptGeneratorProps) {
+// React.memoでラップして、不要な再描画を防止。
+// これにより、他のコンポーネントが更新されても、プロンプトの内容が変わらなければ再描画されません。
+const PromptGenerator = memo(function PromptGenerator({ draft, onChange }: PromptGeneratorProps) {
   const [copiedType, setCopiedType] = useState<"polish" | "roadmap" | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -180,4 +182,6 @@ ${getFormattedDraft()}`;
       )}
     </div>
   );
-}
+});
+
+export default PromptGenerator;
