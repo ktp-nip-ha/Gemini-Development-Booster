@@ -1,6 +1,6 @@
 // firebase.ts
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 // Firebaseの設定（APIキーなどの機密情報）
 const firebaseConfig = {
@@ -12,21 +12,8 @@ const firebaseConfig = {
     appId: "1:290840820432:web:ea6e62ebc85f0138c6bcd5"
 };
 
-// Firebaseを初期化（起動）
+// Firebaseを初期化する
 const app = initializeApp(firebaseConfig);
 
-// Firestore（データベース）の準備
+// 最も標準的で軽量なFirestoreデータベースのインスタンスを取得して公開
 export const db = getFirestore(app);
-
-// 【爆速化の鍵】オフライン永続性（キャッシュ機能）を有効にする
-// これにより、ネットが遅くても端末内のデータを即座に表示でき、
-// 変更内容を一時的に端末に保存して裏側で同期できるようになります。
-enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-        // 複数のタブでアプリを開いている場合に発生することがあります
-        console.warn("Firestoreのキャッシュ有効化に失敗しました（複数タブの可能性）");
-    } else if (err.code === 'unimplemented') {
-        // ブラウザがサポートしていない場合
-        console.warn("このブラウザはFirestoreのキャッシュをサポートしていません");
-    }
-});
