@@ -1,7 +1,7 @@
 import type { Project } from "./types/project";
 
 // 通信用URL（ご自身のサーバーのURLに置き換えてください）
-const SERVER_URL = "http://hazukipasta.s223.xrea.com/save_sidekick.php"; 
+const SERVER_URL = "https://ss1.xrea.com/hazukipasta.s223.xrea.com/save_sidekick.php"; 
 const STORAGE_KEY = "sidekick_backup_data";
 
 /**
