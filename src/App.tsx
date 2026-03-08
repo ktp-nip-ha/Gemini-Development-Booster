@@ -5,9 +5,8 @@ import PromptGenerator from "./components/PromptGenerator";
 import RoadmapTodo from "./components/RoadmapTodo";
 import Dashboard from "./components/Dashboard";
 import { StickyNote, Eraser, Save, Loader2 } from "lucide-react";
-// Firebaseから必要な最小限のツールのみをインポート
-import { db } from "./firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+// 自前サーバー通信用の関数をインポート
+import { saveData, loadData } from "./api";
 import type { Project, ProjectDraft, RoadmapItem } from "./types/project";
 
 function App() {
@@ -24,19 +23,12 @@ function App() {
 
   // --- データの読み込み (一度だけ実行) ---
 
-  // 起動時に1回だけ、Firebaseから全データを取得してくる関数
+  // 起動時に1回だけ、データを取得してくる関数
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // "sidekick_data" ドキュメントを1回だけ読み込む
-        const docRef = doc(db, "app_settings", "sidekick_data");
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          // データがあればステートに入れる
-          const data = docSnap.data();
-          setProjects(data.projects || []);
-        }
+        const loadedProjects = await loadData();
+        setProjects(loadedProjects);
       } catch (error) {
         console.error("読み込みエラー:", error);
       } finally {
@@ -51,16 +43,16 @@ function App() {
 
   // --- 保存処理 (上書き) ---
 
-  // ボタンが押されたとき、現在の全データを1つのJSONとしてFirestoreに保存する関数
+  // ボタンが押されたとき、現在の全データを1つのJSONとしてサーバーに保存する関数
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 1つのドキュメントに全プロジェクトを詰め込んで「上書き」する
-      await setDoc(doc(db, "app_settings", "sidekick_data"), { projects });
+      // サーバーとlocalStorageの両方に保存
+      await saveData(projects);
       alert("保存しました！");
     } catch (error) {
       console.error("保存エラー:", error);
-      alert("保存に失敗しました。");
+      alert("保存に失敗しました。サーバー設定を確認してください。");
     } finally {
       setIsSaving(false);
     }
