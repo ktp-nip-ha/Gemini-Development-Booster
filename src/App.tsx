@@ -28,7 +28,8 @@ function App() {
     const fetchData = async () => {
       try {
         const loadedProjects = await loadData();
-        setProjects(loadedProjects);
+        console.log("取得したデータ:", loadedProjects); // 開発用ログ
+        setProjects(loadedProjects || []);
       } catch (error) {
         console.error("読み込みエラー:", error);
       } finally {
@@ -118,7 +119,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 pb-24">
+    <div className="min-h-screen flex flex-col bg-slate-50 pb-32 relative">
       <Header 
         currentProjectName={currentProject?.name} 
         onBackToDashboard={currentProjectId ? () => setCurrentProjectId(null) : undefined}
@@ -153,7 +154,7 @@ function App() {
             </div>
             
             <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-xl shadow-sm border p-6 flex flex-col gap-4 h-[calc(100vh-250px)] sticky top-8">
+              <div className="bg-white rounded-xl shadow-sm border p-6 flex flex-col gap-4 sticky top-8">
                 <div className="flex items-center justify-between border-b pb-4">
                   <div className="flex items-center gap-2 font-bold">
                     <StickyNote className="w-5 h-5 text-amber-500" />
@@ -164,7 +165,7 @@ function App() {
                   </button>
                 </div>
                 <textarea
-                  className="flex-grow w-full p-4 text-sm bg-amber-50/30 rounded-lg outline-none resize-none"
+                  className="w-full p-4 text-sm bg-amber-50/30 rounded-lg outline-none resize-none min-h-[300px]"
                   placeholder="メモをここに入力..."
                   value={currentProject?.memo || ""}
                   onChange={(e) => handleMemoChange(e.target.value)}
@@ -175,8 +176,8 @@ function App() {
         </>
       )}
 
-      {/* フローティング保存ボタン */}
-      <div className="fixed bottom-8 right-8 z-50">
+      {/* フローティング保存ボタン (最前面固定) */}
+      <div className="fixed bottom-8 right-8 z-[9999]">
         <button
           onClick={handleSave}
           disabled={isSaving}

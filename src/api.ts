@@ -45,7 +45,10 @@ export const loadData = async (): Promise<Project[]> => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      localData = JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        localData = parsed;
+      }
     }
   } catch (e) {
     console.error("LocalStorageからの読み込みに失敗しました:", e);
@@ -58,16 +61,28 @@ export const loadData = async (): Promise<Project[]> => {
     });
     
     if (response.ok) {
-      const data = await response.json();
-      // サーバーから取得したデータを返す（データの構造に合わせて調整）
-      return data.projects || localData;
+      const text = await response.text();
+      // PHP側でエラーが出力されている場合や空の場合を考慮
+      if (text) {
+        try {
+          const data = JSON.parse(text);
+          // projectsキーがある場合と、配列そのものが返ってくる場合の両方を考慮
+          const serverProjects = data.projects || (Array.isArray(data) ? data : null);
+          if (serverProjects) {
+            return serverProjects;
+          }
+        } catch (parseError) {
+          console.error("JSONの解析に失敗しました。サーバーの出力がJSON形式ではない可能性があります:", text);
+        }
+      }
     } else {
-      console.warn("サーバーからの取得に失敗しました。ローカルデータを使用します。");
+      console.warn("サーバーからの取得に失敗しました。ステータスコード:", response.status);
     }
   } catch (error) {
-    console.error("通信エラーが発生しました。ローカルデータを使用します:", error);
+    console.error("通信エラーが発生しました。ローカルデータを確認します:", error);
   }
 
-  // サーバー通信が失敗した、あるいは応答が空の場合はローカルデータを返す
-  return localData;
+  // サーバー通信が失敗した、あるいは応答が不正な場合はローカルデータを返す
+  // ローカルデータも空なら空配列 [] を返す
+  return localData || [];
 };

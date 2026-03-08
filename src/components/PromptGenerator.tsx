@@ -71,7 +71,7 @@ ${getFormattedDraft()}`;
   const isDraftEmpty = !draft.title && !draft.concept && !draft.features && !draft.vibe && !draft.techStack;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border overflow-hidden transition-all duration-300">
+    <div className="bg-white rounded-xl shadow-sm border transition-all duration-300">
       <div 
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
