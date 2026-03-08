@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Copy, Check, GitBranch } from 'lucide-react';
 
 export default function GitCheatSheet() {
