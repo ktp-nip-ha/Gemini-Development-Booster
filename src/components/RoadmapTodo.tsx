@@ -1,144 +1,303 @@
 import { useState } from "react";
-import { ListTodo, Check, Plus, Trash2, User, Bot } from "lucide-react";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { ListTodo, Check, Plus, Trash2, User, Bot, ChevronDown, ChevronRight, Download } from "lucide-react";
+import type { Task, RoadmapItem } from "../types/project";
 
-type TaskAssignee = "human" | "ai";
-
-export interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-  assignee: TaskAssignee;
+interface RoadmapTodoProps {
+  roadmap: RoadmapItem[];
+  onChange: (roadmap: RoadmapItem[]) => void;
 }
 
-export default function RoadmapTodo() {
-  const [tasks, setTasks] = useLocalStorage<Task[]>("devBuddy_tasks", [
-    { id: "1", title: "プロジェクトの初期化", completed: true, assignee: "human" },
-    { id: "2", title: "コンポーネントの作成", completed: false, assignee: "ai" },
-    { id: "3", title: "状態管理の実装", completed: false, assignee: "human" }
-  ]);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
+export default function RoadmapTodo({ roadmap = [], onChange }: RoadmapTodoProps) {
+  const [newRoadmapTitle, setNewRoadmapTitle] = useState("");
+  const [markdownInput, setMarkdownInput] = useState("");
 
-  const addTask = (e: React.FormEvent) => {
+  const safeRoadmap = roadmap || [];
+
+  const addRoadmapItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskTitle.trim()) return;
+    if (!newRoadmapTitle.trim()) return;
     
-    setTasks([
-      ...tasks,
-      { id: Date.now().toString(), title: newTaskTitle, completed: false, assignee: "human" }
+    onChange([
+      ...safeRoadmap,
+      { id: Date.now().toString(), title: newRoadmapTitle, tasks: [], expanded: true }
     ]);
-    setNewTaskTitle("");
+    setNewRoadmapTitle("");
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
+  const addTask = (roadmapId: string) => {
+    const title = window.prompt("タスクを入力してください");
+    if (!title?.trim()) return;
 
-  const toggleAssignee = (id: string) => {
-    setTasks(tasks.map(t => {
-      if (t.id === id) {
-        return { ...t, assignee: t.assignee === "human" ? "ai" : "human" };
+    onChange(safeRoadmap.map(item => {
+      if (item.id === roadmapId) {
+        return {
+          ...item,
+          tasks: [
+            ...(item.tasks || []),
+            { id: Date.now().toString(), title, completed: false, assignee: "human" }
+          ]
+        };
       }
-      return t;
+      return item;
     }));
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
+  const toggleRoadmapExpanded = (id: string) => {
+    onChange(safeRoadmap.map(item => 
+      item.id === id ? { ...item, expanded: !item.expanded } : item
+    ));
   };
 
-  const completedCount = tasks.filter(t => t.completed).length;
-  const progressPercent = tasks.length === 0 ? 0 : Math.round((completedCount / tasks.length) * 100);
+  const deleteRoadmapItem = (id: string) => {
+    if (window.confirm("このセクションを削除しますか？")) {
+      onChange(safeRoadmap.filter(item => item.id !== id));
+    }
+  };
+
+  const toggleTask = (roadmapId: string, taskId: string) => {
+    onChange(safeRoadmap.map(item => {
+      if (item.id === roadmapId) {
+        return {
+          ...item,
+          tasks: (item.tasks || []).map(t => t.id === taskId ? { ...t, completed: !t.completed } : t)
+        };
+      }
+      return item;
+    }));
+  };
+
+  const toggleAssignee = (roadmapId: string, taskId: string) => {
+    onChange(safeRoadmap.map(item => {
+      if (item.id === roadmapId) {
+        return {
+          ...item,
+          tasks: (item.tasks || []).map(t => {
+            if (t.id === taskId) {
+              return { ...t, assignee: t.assignee === "human" ? "ai" : "human" };
+            }
+            return t;
+          })
+        };
+      }
+      return item;
+    }));
+  };
+
+  const deleteTask = (roadmapId: string, taskId: string) => {
+    onChange(safeRoadmap.map(item => {
+      if (item.id === roadmapId) {
+        return {
+          ...item,
+          tasks: (item.tasks || []).filter(t => t.id !== taskId)
+        };
+      }
+      return item;
+    }));
+  };
+
+  const handleImportMarkdown = () => {
+    if (!markdownInput.trim()) return;
+
+    const lines = markdownInput.split("\n");
+    const newRoadmap: RoadmapItem[] = [...safeRoadmap];
+    let currentItem: RoadmapItem | null = null;
+
+    lines.forEach(line => {
+      // 追加：もし行が ``` で始まっていたら、その行は無視して次に進む
+      if (line.trim().startsWith('```')) return;
+      const roadmapMatch = line.match(/^###\s+(.+)$/);
+      const taskMatch = line.match(/^[*-]\s+\[([ xX]?)\]\s+(.+)$/);
+
+      if (roadmapMatch) {
+        currentItem = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          title: roadmapMatch[1].trim(),
+          tasks: [],
+          expanded: true
+        };
+        newRoadmap.push(currentItem);
+      } else if (taskMatch && currentItem) {
+        currentItem.tasks.push({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          title: taskMatch[2].trim(),
+          completed: taskMatch[1].toLowerCase() === "x",
+          assignee: "human"
+        });
+      }
+    });
+
+    onChange(newRoadmap);
+    setMarkdownInput("");
+    alert("Markdownを取り込みました");
+  };
+
+  // 全体の進捗計算
+  const allTasks = safeRoadmap.flatMap(item => item.tasks || []);
+  const totalCompletedCount = allTasks.filter(t => t.completed).length;
+  const totalProgressPercent = allTasks.length === 0 ? 0 : Math.round((totalCompletedCount / allTasks.length) * 100);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6 flex flex-col gap-5 h-full">
-      <div className="flex items-center gap-2 border-b pb-4">
-        <ListTodo className="w-5 h-5 text-indigo-500" />
-        <h2 className="text-lg font-semibold text-slate-800">ロードマップ ＆ ToDo</h2>
+      <div className="flex items-center justify-between border-b pb-4">
+        <div className="flex items-center gap-2">
+          <ListTodo className="w-5 h-5 text-indigo-500" />
+          <h2 className="text-lg font-semibold text-slate-800">ロードマップ ＆ ToDo</h2>
+        </div>
       </div>
 
       {/* Progress Bar */}
       <div className="flex flex-col gap-2">
         <div className="flex justify-between text-sm text-slate-600 font-medium">
-          <span>進捗率</span>
-          <span>{progressPercent}%</span>
+          <span>全体の進捗率</span>
+          <span>{totalProgressPercent}%</span>
         </div>
         <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
           <div 
             className="h-full bg-indigo-500 transition-all duration-500 ease-out"
-            style={{ width: `${progressPercent}%` }}
+            style={{ width: `${totalProgressPercent}%` }}
           />
         </div>
       </div>
 
-      {/* Task Input */}
-      <form onSubmit={addTask} className="flex gap-2">
+      {/* Roadmap Input */}
+      <form onSubmit={addRoadmapItem} className="flex gap-2">
         <input
           type="text"
-          className="flex-grow px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
-          placeholder="新しいタスクを追加..."
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
+          className="flex-grow px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow text-sm"
+          placeholder="新しいロードマップ（親）を追加..."
+          value={newRoadmapTitle}
+          onChange={(e) => setNewRoadmapTitle(e.target.value)}
         />
         <button 
           type="submit"
-          className="bg-slate-800 hover:bg-slate-900 text-white p-2.5 rounded-lg transition-colors"
-          disabled={!newTaskTitle.trim()}
+          className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm whitespace-nowrap"
+          disabled={!newRoadmapTitle.trim()}
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
+          親追加
         </button>
       </form>
 
-      {/* Task List */}
-      <div className="flex flex-col gap-2 overflow-y-auto max-h-[400px] pr-1">
-        {tasks.map(task => (
-          <div 
-            key={task.id} 
-            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-              task.completed ? "bg-slate-50 border-slate-200" : "bg-white border-slate-200 hover:border-indigo-300"
-            }`}
-          >
-            <div className="flex items-center gap-3 overflow-hidden">
-              <button 
-                onClick={() => toggleTask(task.id)}
-                className={`flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
-                  task.completed ? "bg-indigo-500 border-indigo-500 text-white" : "border-slate-300 hover:border-indigo-500"
-                }`}
-              >
-                {task.completed && <Check className="w-4 h-4" />}
-              </button>
-              <span className={`truncate text-sm font-medium ${task.completed ? "text-slate-400 line-through" : "text-slate-700"}`}>
-                {task.title}
-              </span>
-            </div>
+      {/* Markdown Import Area */}
+      <div className="flex flex-col gap-2 p-3 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">コピペ成形ツール (Markdown)</label>
+        <textarea
+          className="w-full h-20 px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+          placeholder="### 親項目&#10;- [ ] 子タスク1&#10;- [ ] 子タスク2"
+          value={markdownInput}
+          onChange={(e) => setMarkdownInput(e.target.value)}
+        />
+        <button
+          onClick={handleImportMarkdown}
+          className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-sm font-medium transition-colors"
+          disabled={!markdownInput.trim()}
+        >
+          <Download className="w-4 h-4" />
+          Markdownから一括登録
+        </button>
+      </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-              <button
-                onClick={() => toggleAssignee(task.id)}
-                className={`flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded-md border transition-colors ${
-                  task.assignee === "human" 
-                    ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" 
-                    : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                }`}
-                title="クリックで担当を切り替え"
-              >
-                {task.assignee === "human" ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
-                {task.assignee === "human" ? "人間" : "AI"}
-              </button>
-              
-              <button 
-                onClick={() => deleteTask(task.id)}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))}
+      {/* Roadmap List */}
+      <div className="flex flex-col gap-4 pr-1">
+        {safeRoadmap.map(item => {
+          const itemTasks = item.tasks || [];
+          const itemCompletedCount = itemTasks.filter(t => t.completed).length;
+          const itemProgressPercent = itemTasks.length === 0 ? 0 : Math.round((itemCompletedCount / itemTasks.length) * 100);
 
-        {tasks.length === 0 && (
+          return (
+            <div key={item.id} className="border rounded-lg overflow-hidden">
+              {/* Parent Header */}
+              <div 
+                className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${
+                  itemProgressPercent === 100 
+                    ? "bg-emerald-50 border-emerald-200"
+                    : item.expanded ? "bg-slate-50 border-b" : "bg-white hover:bg-slate-50"
+                }`}
+                onClick={() => toggleRoadmapExpanded(item.id)}
+>
+                <div className="flex items-center gap-2 overflow-hidden flex-grow">
+                  {item.expanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                  <span className="font-bold text-slate-700 truncate">{item.title}</span>
+                  <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold">
+                    {itemProgressPercent}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={() => addTask(item.id)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                    title="子タスクを追加"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => deleteRoadmapItem(item.id)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Children Tasks */}
+              {item.expanded && (
+                <div className="p-2 flex flex-col gap-2 bg-white">
+                  {itemTasks.map(task => (
+                    <div 
+                      key={task.id} 
+                      className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
+                        task.completed ? "bg-slate-50 border-slate-100" : "bg-white border-slate-200 hover:border-indigo-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <button 
+                          onClick={() => toggleTask(item.id, task.id)}
+                          className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                            task.completed ? "bg-indigo-500 border-indigo-500 text-white" : "border-slate-300 hover:border-indigo-500"
+                          }`}
+                        >
+                          {task.completed && <Check className="w-3 h-3" />}
+                        </button>
+                        <span className={`truncate text-xs font-medium ${task.completed ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                          {task.title}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <button
+                          onClick={() => toggleAssignee(item.id, task.id)}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors ${
+                            task.assignee === "human" 
+                              ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" 
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                          }`}
+                        >
+                          {task.assignee === "human" ? <User className="w-2.5 h-2.5" /> : <Bot className="w-2.5 h-2.5" />}
+                          {task.assignee === "human" ? "人間" : "AI"}
+                        </button>
+                        <button 
+                          onClick={() => deleteTask(item.id, task.id)}
+                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {itemTasks.length === 0 && (
+                    <div className="text-center py-4 text-slate-400 text-xs italic">
+                      タスクがありません
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {safeRoadmap.length === 0 && (
           <div className="text-center py-8 text-slate-500 text-sm">
-            タスクがありません。新しいタスクを追加してください。
+            ロードマップがありません。新しいセクションを追加するか、Markdownからインポートしてください。
           </div>
         )}
       </div>
