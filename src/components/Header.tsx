@@ -1,4 +1,5 @@
 import { ExternalLink, Sparkles, ChevronLeft } from "lucide-react";
+import GitCheatSheet from "./GitCheatSheet";
 
 interface HeaderProps {
   currentProjectName?: string;
@@ -38,13 +39,16 @@ export default function Header({ currentProjectName, onBackToDashboard }: Header
           </div>
         </div>
         
-        <button
-          onClick={openGemini}
-          className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full font-medium transition-colors"
-        >
-          <span className="hidden sm:inline">Geminiを開く</span>
-          <ExternalLink className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          <GitCheatSheet />
+          <button
+            onClick={openGemini}
+            className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full font-medium transition-colors"
+          >
+            <span className="hidden sm:inline">Geminiを開く</span>
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </header>
   );
