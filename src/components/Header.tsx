@@ -1,0 +1,26 @@
+import { ExternalLink, Sparkles } from "lucide-react";
+
+export default function Header() {
+  const openGemini = () => {
+    window.open("https://gemini.google.com/app", "_blank");
+  };
+
+  return (
+    <header className="bg-white border-b sticky top-0 z-10 shadow-sm">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-indigo-600">
+          <Sparkles className="w-6 h-6" />
+          <h1 className="text-xl font-bold tracking-tight">Gemini Development Booster</h1>
+        </div>
+        
+        <button
+          onClick={openGemini}
+          className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full font-medium transition-colors"
+        >
+          <span>Geminiを開く</span>
+          <ExternalLink className="w-4 h-4" />
+        </button>
+      </div>
+    </header>
+  );
+}
