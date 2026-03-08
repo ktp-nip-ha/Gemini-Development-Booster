@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { ListTodo, Check, Plus, Trash2, User, Bot, ChevronDown, ChevronRight, Download } from "lucide-react";
-import type { Task, RoadmapItem } from "../types/project";
+import { ListTodo, Check, Plus, Trash2, User, Bot, ChevronDown, ChevronRight, Download, MessageSquare, Camera } from "lucide-react";
+import type { RoadmapItem } from "../types/project";
 
 interface RoadmapTodoProps {
   roadmap: RoadmapItem[];
   onChange: (roadmap: RoadmapItem[]) => void;
+  projectName?: string;
+  scratchPad?: string;
 }
 
-export default function RoadmapTodo({ roadmap = [], onChange }: RoadmapTodoProps) {
+export default function RoadmapTodo({ roadmap = [], onChange, projectName = "不明なプロジェクト", scratchPad = "" }: RoadmapTodoProps) {
   const [newRoadmapTitle, setNewRoadmapTitle] = useState("");
   const [markdownInput, setMarkdownInput] = useState("");
+  const [includeScratchPad, setIncludeScratchPad] = useState(true);
 
   const safeRoadmap = roadmap || [];
 
@@ -95,6 +98,33 @@ export default function RoadmapTodo({ roadmap = [], onChange }: RoadmapTodoProps
     }));
   };
 
+  const handleStrategyMeeting = (item: RoadmapItem) => {
+    const taskList = (item.tasks || [])
+      .map(t => `- [${t.completed ? "x" : " "}] ${t.title} (担当: ${t.assignee === "human" ? "人間" : "AI"})`)
+      .join("\n");
+
+    const prompt = `以下のフェーズについての作戦会議をお願いします。
+
+## フェーズ: ${item.title}
+
+### 現在のToDoリスト:
+${taskList || "（タスクなし）"}
+
+### 相談内容:
+1. このフェーズをどう進めるべきか
+2. AIと人間の役割分担の提案
+3. 最初にCursorに投げるべき指示（プロンプト）の作成
+
+上記3点について、具体的なアドバイスをお願いします。`;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      alert("作戦会議用のプロンプトをクリップボードにコピーしました。Geminiに貼り付けて相談してください。");
+    }).catch(err => {
+      console.error("Failed to copy: ", err);
+      alert("コピーに失敗しました。");
+    });
+  };
+
   const handleImportMarkdown = () => {
     if (!markdownInput.trim()) return;
 
@@ -131,6 +161,51 @@ export default function RoadmapTodo({ roadmap = [], onChange }: RoadmapTodoProps
     alert("Markdownを取り込みました");
   };
 
+  const handleSnapshot = () => {
+    const summary = safeRoadmap.map(item => {
+      const tasks = item.tasks || [];
+      const completedCount = tasks.filter(t => t.completed).length;
+      const incompleteTasks = tasks.filter(t => !t.completed);
+      
+      return {
+        title: item.title,
+        completedCount,
+        incompleteTasks
+      };
+    });
+
+    const completedSummary = summary
+      .filter(s => s.completedCount > 0)
+      .map(s => `・${s.title}：${s.completedCount}件のタスクを完了`)
+      .join("\n");
+
+    const incompleteList = summary
+      .flatMap(s => s.incompleteTasks.map(t => `- [ ] ${t.title} (${s.title})`))
+      .join("\n");
+
+    let prompt = `## **【現在の開発状況スナップショット】**
+アプリ名：${projectName}
+**完了済み（要約）：**
+${completedSummary || "なし"}
+
+**未完了（次に取り組むこと）：**
+${incompleteList || "なし（すべてのタスクが完了しています！）"}`;
+
+    if (includeScratchPad && scratchPad.trim()) {
+      prompt += `\n\n【一時メモの内容】\n${scratchPad}`;
+    }
+
+    prompt += `\n\n## **【Geminiへの依頼】**
+現在の進捗は上記の通りです。これらを踏まえて、次に着手すべき機能の実装方針や、注意点を教えてください。`;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      alert("開発状況のスナップショットをクリップボードにコピーしました。Geminiに貼り付けて相談してください。");
+    }).catch(err => {
+      console.error("Failed to copy snapshot: ", err);
+      alert("コピーに失敗しました。");
+    });
+  };
+
   // 全体の進捗計算
   const allTasks = safeRoadmap.flatMap(item => item.tasks || []);
   const totalCompletedCount = allTasks.filter(t => t.completed).length;
@@ -142,6 +217,25 @@ export default function RoadmapTodo({ roadmap = [], onChange }: RoadmapTodoProps
         <div className="flex items-center gap-2">
           <ListTodo className="w-5 h-5 text-indigo-500" />
           <h2 className="text-lg font-semibold text-slate-800">ロードマップ ＆ ToDo</h2>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
+            <input 
+              type="checkbox" 
+              checked={includeScratchPad} 
+              onChange={(e) => setIncludeScratchPad(e.target.checked)}
+              className="rounded text-indigo-500 focus:ring-indigo-500"
+            />
+            メモを含める
+          </label>
+          <button
+            onClick={handleSnapshot}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md active:scale-95"
+            title="現在の進捗状況をプロンプトとしてコピー"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            作業状況をスナップショット
+          </button>
         </div>
       </div>
 
@@ -223,6 +317,13 @@ export default function RoadmapTodo({ roadmap = [], onChange }: RoadmapTodoProps
                   </span>
                 </div>
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={() => handleStrategyMeeting(item)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                    title="作戦会議（プロンプトをコピー）"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </button>
                   <button 
                     onClick={() => addTask(item.id)}
                     className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"

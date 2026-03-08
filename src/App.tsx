@@ -3,14 +3,15 @@ import Header from "./components/Header";
 import ProjectHeader from "./components/ProjectHeader";
 import PromptGenerator from "./components/PromptGenerator";
 import RoadmapTodo from "./components/RoadmapTodo";
-import CodeExtractor from "./components/CodeExtractor";
 import Dashboard from "./components/Dashboard";
+import { StickyNote, Eraser } from "lucide-react";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import type { Project, ProjectDraft, RoadmapItem } from "./types/project";
 
 function App() {
   const [projects, setProjects] = useLocalStorage<Project[]>("devBuddy_projects", []);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [scratchPad, setScratchPad] = useLocalStorage("devBuddy_scratchpad", "");
 
   // 既存データの移行処理（初回のみ）
   useEffect(() => {
@@ -92,28 +93,60 @@ function App() {
       ) : (
         <>
           {currentProject && <ProjectHeader project={currentProject} />}
-          <main className="flex-grow container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-300">
-          <div className="flex flex-col gap-8">
-            {currentProject && (
-              <PromptGenerator 
-                draft={currentProject.draft} 
-                onChange={handleDraftChange} 
-              />
-            )}
-            <CodeExtractor />
-          </div>
-          
-          <div className="flex flex-col gap-8">
-            {currentProject && (
-              <RoadmapTodo 
-                roadmap={currentRoadmap} 
-                onChange={handleRoadmapChange} 
-              />
-            )}
-          </div>
-        </main>
-      </>
-    )}
+          <main className="flex-grow container mx-auto px-4 py-8 grid grid-cols-1 xl:grid-cols-3 gap-8 animate-in fade-in duration-300">
+            <div className="flex flex-col gap-8 xl:col-span-2">
+              <div className="flex flex-col gap-8">
+                {currentProject && (
+                  <PromptGenerator 
+                    draft={currentProject.draft} 
+                    onChange={handleDraftChange} 
+                  />
+                )}
+                
+                <div className="grid grid-cols-1 gap-8">
+                  <div className="flex flex-col gap-8">
+                    {currentProject && (
+                      <RoadmapTodo 
+                        roadmap={currentRoadmap} 
+                        onChange={handleRoadmapChange}
+                        projectName={currentProject.name}
+                        scratchPad={scratchPad}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              <div className="bg-white rounded-xl shadow-sm border p-6 flex flex-col gap-4 h-[calc(100vh-250px)] sticky top-8">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div className="flex items-center gap-2">
+                    <StickyNote className="w-5 h-5 text-amber-500" />
+                    <h2 className="text-lg font-semibold text-slate-800">一時メモ (ScratchPad)</h2>
+                  </div>
+                  <button 
+                    onClick={() => setScratchPad("")}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                    title="メモをクリア"
+                  >
+                    <Eraser className="w-4 h-4" />
+                  </button>
+                </div>
+                <textarea
+                  className="flex-grow w-full p-4 text-sm border-none bg-amber-50/30 rounded-lg focus:ring-2 focus:ring-amber-200 outline-none resize-none font-mono leading-relaxed"
+                  placeholder="Geminiからの指示や、一時的なメモをここに貼り付けてください..."
+                  value={scratchPad}
+                  onChange={(e) => setScratchPad(e.target.value)}
+                />
+                <p className="text-[10px] text-slate-400 text-right italic">
+                  ※入力内容は自動保存されます
+                </p>
+              </div>
+            </div>
+          </main>
+        </>
+      )}
       
       <footer className="py-6 text-center text-sm text-slate-400 border-t bg-white mt-auto">
         &copy; 2026 Gemini Development Booster
