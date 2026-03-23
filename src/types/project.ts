@@ -10,7 +10,9 @@ export interface Task {
 export interface ProjectDraft {
   title: string;
   concept: string;
-  features: string;
+  coreExperience: string;
+  mvpFeatures: string;
+  extraFeatures: string;
   vibe: string;
   techStack: string;
 }

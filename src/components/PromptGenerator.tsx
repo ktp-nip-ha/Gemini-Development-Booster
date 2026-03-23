@@ -10,8 +10,9 @@ interface PromptGeneratorProps {
 // React.memoでラップして、不要な再描画を防止。
 // これにより、他のコンポーネントが更新されても、プロンプトの内容が変わらなければ再描画されません。
 const PromptGenerator = memo(function PromptGenerator({ draft, onChange }: PromptGeneratorProps) {
-  const [copiedType, setCopiedType] = useState<"polish" | "roadmap" | null>(null);
+  const [copiedType, setCopiedType] = useState<"polish" | "roadmap" | "summary" | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [markdownInput, setMarkdownInput] = useState("");
 
   const updateDraft = (field: keyof ProjectDraft, value: string) => {
     onChange(prev => ({ ...prev, [field]: value }));
@@ -24,8 +25,14 @@ ${draft.title || "（未定）"}
 【一言コンセプト】
 ${draft.concept || "（未定）"}
 
-【主要機能】
-${draft.features || "（未定）"}
+【コア体験】
+${draft.coreExperience || "（未定）"}
+
+【最小機能】
+${draft.mvpFeatures || "（未定）"}
+
+【追加機能】
+${draft.extraFeatures || "（未定）"}
 
 【こだわり/Vibe】
 ${draft.vibe || "（未定）"}
@@ -41,9 +48,9 @@ ${draft.techStack || "（未定）"}`;
   };
 
   const generateRoadmapPrompt = () => {
-    return `あなたは優秀な開発アシスタントです。
-以下の【企画案】をもとに、開発の「ロードマップ」と「詳細ToDoリスト」を作成してください。
-その際、私のWebアプリ側で自動解析を行うため、**必ず以下のフォーマットを厳守**してください。
+    return `土台を Google Antigravity で作成するので、それを踏まえた開発ロードマップを作成してください。
+
+以下の【企画案】の全7項目（タイトル、コンセプト、コア体験、MVP機能、追加機能、Vibe、技術スタック）を踏まえて、ステップごとの具体的な実装手順を段階ごとに提案してください。
 
 ## 厳守ルール（非常に重要）
 1. 挨拶、前置き、結びの言葉、注釈は、一文字たりとも出力しないでください。
@@ -61,14 +68,123 @@ ${draft.techStack || "（未定）"}`;
 ${getFormattedDraft()}`;
   };
 
-  const handleCopy = (type: "polish" | "roadmap") => {
-    const prompt = type === "polish" ? generatePolishPrompt() : generateRoadmapPrompt();
+  const generateSummaryPrompt = () => {
+    return `これまでの対話を踏まえ、以下の【形式】を厳守してMarkdownで出力してください。
+・余計な挨拶や解説は一切禁止。
+・各項目は必ず【項目名】で開始すること。
+・箇条書きは必ずハイフン（-）を使用すること。
+
+【タイトル】
+（アプリ名）
+
+【一言コンセプト】
+（簡潔な説明）
+
+【コア体験】
+（ユーザーがどう感じるか。複数行可）
+
+【最小機能】
+- [ ] （必須機能1）
+- [ ] （必須機能2）
+
+【追加機能】
+- [ ] （余裕があればやりたいこと1）
+
+【雰囲気】
+（世界観や重視するポイント）
+
+【技術スタック】
+（使用言語やフレームワーク）`;
+  };
+
+  const handleCopy = (type: "polish" | "roadmap" | "summary") => {
+    let prompt: string;
+    if (type === "polish") {
+      prompt = generatePolishPrompt();
+    } else if (type === "roadmap") {
+      prompt = generateRoadmapPrompt();
+    } else {
+      prompt = generateSummaryPrompt();
+    }
     navigator.clipboard.writeText(prompt);
     setCopiedType(type);
     setTimeout(() => setCopiedType(null), 2000);
   };
 
-  const isDraftEmpty = !draft.title && !draft.concept && !draft.features && !draft.vibe && !draft.techStack;
+  const handleImportMarkdown = () => {
+    if (!markdownInput.trim()) return;
+
+    // 行頭のアスタリスク形式をハイフン形式に正規化
+    const normalizedInput = markdownInput
+      .split("\n")
+      .map(line => {
+        // 行頭の `* [ ] ` → `- [ ] `
+        if (line.match(/^\s*\*\s*\[\s*\]/)) {
+          return line.replace(/^(\s*)\*(\s*\[\s*\])/, "$1-$2");
+        }
+        // 行頭の `* ` → `- `
+        if (line.match(/^\s*\*\s/)) {
+          return line.replace(/^(\s*)\*(\s)/, "$1-$2");
+        }
+        return line;
+      })
+      .join("\n");
+
+    const lines = normalizedInput.split("\n");
+    const extractedData: Partial<ProjectDraft> = {};
+
+    let currentSection: keyof ProjectDraft | null = null;
+    let currentContent: string[] = [];
+
+    const sectionMap: Record<string, keyof ProjectDraft> = {
+      "タイトル": "title",
+      "一言コンセプト": "concept",
+      "コア体験": "coreExperience",
+      "最小機能": "mvpFeatures",
+      "追加機能": "extraFeatures",
+      "雰囲気": "vibe",
+      "技術スタック": "techStack"
+    };
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      
+      // 【タイトル】 のような括弧付きセクションを検出
+      const sectionMatch = trimmed.match(/【(.+?)】/);
+      if (sectionMatch) {
+        // 前のセクションを保存
+        if (currentSection && currentContent.length > 0) {
+          const content = currentContent.join("\n").trim();
+          if (content) {
+            extractedData[currentSection] = content;
+          }
+        }
+
+        // 新しいセクションをセット
+        const sectionName = sectionMatch[1];
+        currentSection = sectionMap[sectionName] || null;
+        currentContent = [];
+      } else if (currentSection && trimmed) {
+        // セクション内のコンテンツを追加
+        currentContent.push(line);
+      }
+    });
+
+    // 最後のセクションを保存
+    if (currentSection && currentContent.length > 0) {
+      const content = currentContent.join("\n").trim();
+      if (content) {
+        extractedData[currentSection] = content;
+      }
+    }
+
+    // Stateに反映
+    onChange(prev => ({ ...prev, ...extractedData }));
+    setMarkdownInput("");
+    alert("企画Markdownを取り込みました");
+  };
+
+  const isDraftEmpty = !draft.title && !draft.concept && !draft.coreExperience && !draft.mvpFeatures && !draft.extraFeatures && !draft.vibe && !draft.techStack;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border transition-all duration-300">
@@ -123,19 +239,43 @@ ${getFormattedDraft()}`;
 
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">
-                主要機能
+                コア体験
               </label>
               <textarea
-                className="w-full px-3 py-2 border rounded-lg h-24 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
-                placeholder="・プロンプト生成&#10;・ToDo管理&#10;・コード抽出機能"
-                value={draft.features}
-                onChange={(e) => updateDraft("features", e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg h-16 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                placeholder="ユーザーが最初に感じる体験、中核となる価値"
+                value={draft.coreExperience}
+                onChange={(e) => updateDraft("coreExperience", e.target.value)}
               />
             </div>
 
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">
-                こだわり/Vibe
+                最小機能（MVP Features）
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border rounded-lg h-16 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                placeholder="・基本的な機能1&#10;・基本的な機能2&#10;・基本的な機能3"
+                value={draft.mvpFeatures}
+                onChange={(e) => updateDraft("mvpFeatures", e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">
+                追加機能（Extra Features）
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border rounded-lg h-16 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                placeholder="・拡張機能1&#10;・拡張機能2&#10;・将来的な機能"
+                value={draft.extraFeatures}
+                onChange={(e) => updateDraft("extraFeatures", e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">
+                雰囲気
               </label>
               <textarea
                 className="w-full px-3 py-2 border rounded-lg h-20 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
@@ -161,6 +301,15 @@ ${getFormattedDraft()}`;
 
           <div className="mt-2 pt-4 border-t flex flex-wrap gap-3 justify-end">
             <button
+              onClick={() => handleCopy("summary")}
+              disabled={isDraftEmpty}
+              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 px-4 py-2.5 rounded-lg font-medium transition-colors border border-slate-300"
+            >
+              {copiedType === "summary" ? <Check className="w-4 h-4 text-emerald-600" /> : <MessageSquare className="w-4 h-4" />}
+              <span>{copiedType === "summary" ? "コピー完了！" : "企画まとめプロンプト"}</span>
+            </button>
+
+            <button
               onClick={() => handleCopy("polish")}
               disabled={isDraftEmpty}
               className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 px-4 py-2.5 rounded-lg font-medium transition-colors border border-slate-300"
@@ -176,6 +325,25 @@ ${getFormattedDraft()}`;
             >
               {copiedType === "roadmap" ? <Check className="w-4 h-4" /> : <Map className="w-4 h-4" />}
               <span>{copiedType === "roadmap" ? "ロードマップを作成" : "ロードマップを作成"}</span>
+            </button>
+          </div>
+
+          {/* Markdown Import Area */}
+          <div className="flex flex-col gap-2 p-3 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">企画コピペ成形 (Markdown)</label>
+            <textarea
+              className="w-full h-20 px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="【タイトル】&#10;...&#10;【一言コンセプト】&#10;...&#10;【コア体験】&#10;...&#10;【最小機能】&#10;...&#10;【追加機能】&#10;...&#10;【こだわり/Vibe】&#10;...&#10;【技術スタック】&#10;..."
+              value={markdownInput}
+              onChange={(e) => setMarkdownInput(e.target.value)}
+            />
+            <button
+              onClick={handleImportMarkdown}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-sm font-medium transition-colors"
+              disabled={!markdownInput.trim()}
+            >
+              <Check className="w-3.5 h-3.5" />
+              反映
             </button>
           </div>
         </div>

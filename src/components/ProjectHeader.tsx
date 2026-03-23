@@ -52,13 +52,25 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
                   {project.draft.concept || "（未定）"}
                 </div>
               </div>
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
-                  【主要機能】
-                </h3>
-                <div className="text-indigo-50 whitespace-pre-wrap mb-4">
-                  {project.draft.features || "（未定）"}
-                </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+                【コア体験】
+              </h3>
+              <div className="text-indigo-50 whitespace-pre-wrap mb-4">
+                {project.draft.coreExperience || "（未定）"}
+              </div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+                【最小機能】
+              </h3>
+              <div className="text-indigo-50 whitespace-pre-wrap mb-4">
+                {project.draft.mvpFeatures || "（未定）"}
+              </div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+                【追加機能】
+              </h3>
+              <div className="text-indigo-50 whitespace-pre-wrap mb-4">
+                {project.draft.extraFeatures || "（未定）"}
+              </div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
                   【こだわり/Vibe】
                 </h3>

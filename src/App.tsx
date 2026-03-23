@@ -66,7 +66,7 @@ function App() {
     const newProject: Project = {
       id: Date.now().toString(),
       name,
-      draft: { title: "", concept: "", features: "", vibe: "", techStack: "" },
+      draft: { title: "", concept: "", coreExperience: "", mvpFeatures: "", extraFeatures: "", vibe: "", techStack: "" },
       roadmap: [],
       memo: "",
       createdAt: Date.now()

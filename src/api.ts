@@ -38,6 +38,7 @@ export const saveData = async (projects: Project[]): Promise<void> => {
 /**
  * データを読み込む関数
  * サーバーからのGET取得を試み、失敗した場合はlocalStorageから読み込みます。
+ * 古いフォーマット（features）を新しいフォーマット（coreExperience, mvpFeatures, extraFeatures）に自動変換します。
  */
 export const loadData = async (): Promise<Project[]> => {
   // まずはlocalStorageからバックアップを読み込んでおく
@@ -69,7 +70,7 @@ export const loadData = async (): Promise<Project[]> => {
           // projectsキーがある場合と、配列そのものが返ってくる場合の両方を考慮
           const serverProjects = data.projects || (Array.isArray(data) ? data : null);
           if (serverProjects) {
-            return serverProjects;
+            return convertProjects(serverProjects);
           }
         } catch (parseError) {
           console.error("JSONの解析に失敗しました。サーバーの出力がJSON形式ではない可能性があります:", text);
@@ -84,5 +85,33 @@ export const loadData = async (): Promise<Project[]> => {
 
   // サーバー通信が失敗した、あるいは応答が不正な場合はローカルデータを返す
   // ローカルデータも空なら空配列 [] を返す
-  return localData || [];
+  return convertProjects(localData || []);
 };
+
+/**
+ * 古いフォーマットのデータを新しいフォーマットに変換する関数
+ * features フィールドを持つ ProjectDraft を新しい3つのフィールド（coreExperience, mvpFeatures, extraFeatures）に分割
+ */
+function convertProjects(projects: Project[]): Project[] {
+  return projects.map(project => {
+    // @ts-ignore - 古いフォーマットには features があるが、新しい型には無い
+    if (project.draft.features && !project.draft.coreExperience) {
+      // 古いフォーマット（features）を新しいフォーマットに変換
+      // @ts-ignore
+      const oldFeatures = project.draft.features;
+      return {
+        ...project,
+        draft: {
+          title: project.draft.title,
+          concept: project.draft.concept,
+          coreExperience: "", // ユーザーが手動で設定する
+          mvpFeatures: oldFeatures, // 古い features を mvpFeatures に移行
+          extraFeatures: "",
+          vibe: project.draft.vibe,
+          techStack: project.draft.techStack,
+        }
+      };
+    }
+    return project;
+  });
+}
